@@ -6,28 +6,25 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>Multi-Tenant Aggregation Layer</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
   <style>
     :root {
       --bg: #06090f;
-      --surface: #0d1420;
       --card: #111b26;
+      --surface: #0d1420;
       --line: #1e2d3d;
       --line2: #243243;
       --ink: #e8f0f8;
       --ink2: #9db4cb;
       --ink3: #5a7a96;
       --blue: #2d7ef7;
-      --blue-dim: rgba(45, 126, 247, .12);
+      --bdim: rgba(45, 126, 247, .12);
       --green: #2ec990;
-      --green-dim: rgba(46, 201, 144, .12);
       --amber: #f5a623;
-      --amber-dim: rgba(245, 166, 35, .12);
       --red: #e85d5d;
-      --red-dim: rgba(232, 93, 93, .12);
+      --purple: #a78bfa;
       --r: 10px;
       --r2: 6px;
       font-family: 'Inter', system-ui, sans-serif;
@@ -48,27 +45,169 @@
     }
 
     body {
-      padding: 0 0 60px
+      padding-bottom: 60px
     }
 
+    /* login */
+    #loginWrap {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center
+    }
+
+    .lbox {
+      background: var(--card);
+      border: 1px solid var(--line2);
+      border-radius: 14px;
+      padding: 38px 34px;
+      width: 340px
+    }
+
+    .ltitle {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 3px
+    }
+
+    .ltitle span {
+      color: var(--blue)
+    }
+
+    .lsub {
+      font-size: 12px;
+      color: var(--ink3);
+      margin-bottom: 26px
+    }
+
+    .lfield {
+      font-size: 11px;
+      color: var(--ink3);
+      margin-bottom: 5px;
+      display: block
+    }
+
+    .linput {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--line2);
+      color: var(--ink);
+      padding: 9px 12px;
+      border-radius: var(--r2);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      margin-bottom: 13px
+    }
+
+    .linput:focus {
+      border-color: var(--blue)
+    }
+
+    .lbtn {
+      width: 100%;
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      border-radius: var(--r2);
+      padding: 10px;
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px
+    }
+
+    .lbtn:hover {
+      filter: brightness(1.1)
+    }
+
+    .lerr {
+      font-size: 12px;
+      color: var(--red);
+      margin-top: 10px;
+      min-height: 18px;
+      text-align: center
+    }
+
+    .lhint {
+      font-size: 11px;
+      color: var(--ink3);
+      margin-top: 12px;
+      text-align: center
+    }
+
+    #eyeBtn:hover,
+    #aEyeBtn:hover {
+      color: var(--blue)
+    }
+
+    .rolecard {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--line2);
+      border-radius: var(--r2);
+      padding: 14px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: .15s;
+      text-align: left
+    }
+
+    .rolecard:hover {
+      border-color: var(--blue);
+      background: var(--bdim)
+    }
+
+    .ricon {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: none
+    }
+
+    .backbtn {
+      background: none;
+      border: none;
+      color: var(--ink3);
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 14px
+    }
+
+    .backbtn:hover {
+      color: var(--blue)
+    }
+
+    /* topbar */
     .topbar {
       position: sticky;
       top: 0;
       z-index: 40;
-      background: rgba(6, 9, 15, .9);
+      background: rgba(6, 9, 15, .92);
       backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--line);
       padding: 0 24px;
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
       height: 52px
     }
 
     .logo {
       font-size: 14px;
       font-weight: 600;
-      letter-spacing: -.01em;
       white-space: nowrap
     }
 
@@ -81,12 +220,11 @@
       font-weight: 500;
       padding: 2px 7px;
       border-radius: 3px;
-      background: var(--blue-dim);
-      color: var(--blue);
-      letter-spacing: .04em
+      background: var(--bdim);
+      color: var(--blue)
     }
 
-    .topbar-right {
+    .tr {
       margin-left: auto;
       display: flex;
       align-items: center;
@@ -98,8 +236,7 @@
       height: 7px;
       border-radius: 50%;
       background: var(--green);
-      box-shadow: 0 0 6px var(--green);
-      transition: background .3s
+      box-shadow: 0 0 6px var(--green)
     }
 
     .fdot.stale {
@@ -116,13 +253,12 @@
     .hpill {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       padding: 4px 10px;
       border-radius: 20px;
       border: 1px solid var(--line2);
       font-size: 11px;
-      cursor: pointer;
-      transition: .2s
+      cursor: pointer
     }
 
     .hpill.ok {
@@ -140,8 +276,34 @@
       color: var(--red)
     }
 
-    .controls {
-      padding: 14px 24px;
+    .tpill {
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: var(--bdim);
+      border: 1px solid rgba(45, 126, 247, .3);
+      font-size: 11px;
+      color: var(--blue)
+    }
+
+    .outbtn {
+      background: none;
+      border: 1px solid var(--line2);
+      color: var(--ink3);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer
+    }
+
+    .outbtn:hover {
+      border-color: var(--red);
+      color: var(--red)
+    }
+
+    /* controls */
+    .ctrl {
+      padding: 13px 24px;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -198,7 +360,7 @@
     }
 
     .pg button.on {
-      background: var(--blue-dim);
+      background: var(--bdim);
       color: var(--blue)
     }
 
@@ -212,9 +374,7 @@
       font-family: inherit;
       cursor: pointer;
       font-weight: 500;
-      transition: filter .15s;
-      height: 32px;
-      white-space: nowrap
+      height: 32px
     }
 
     .btn:hover {
@@ -227,17 +387,19 @@
       color: var(--ink2)
     }
 
-    .btn.g:hover {
+    .btn.g:hover,
+    .btn.g.on {
       border-color: var(--blue);
-      color: var(--blue)
+      color: var(--blue);
+      background: var(--bdim)
     }
 
+    /* main */
     .main {
-      padding: 20px 24px;
+      padding: 18px 24px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      max-width: 1600px
+      gap: 14px
     }
 
     .krow {
@@ -283,14 +445,13 @@
       font-size: 26px;
       font-weight: 500;
       color: var(--ink);
-      letter-spacing: -.02em;
       line-height: 1
     }
 
     .ks {
       font-size: 11px;
       color: var(--ink3);
-      margin-top: 6px;
+      margin-top: 5px;
       font-family: 'JetBrains Mono', monospace
     }
 
@@ -345,18 +506,6 @@
     .cwrap {
       position: relative;
       height: 180px
-    }
-
-    .brow {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px
-    }
-
-    @media(max-width:900px) {
-      .brow {
-        grid-template-columns: 1fr
-      }
     }
 
     .pl {
@@ -476,29 +625,48 @@
       color: var(--red)
     }
 
-    .arow {
+    /* admin panel */
+    .apanel {
+      background: var(--card);
+      border: 1px solid var(--line2);
+      border-radius: var(--r);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px
+    }
+
+    .atoggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line)
+    }
+
+    .agrid {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       gap: 12px
     }
 
     @media(max-width:1100px) {
-      .arow {
+      .agrid {
         grid-template-columns: 1fr 1fr
       }
     }
 
     @media(max-width:700px) {
-      .arow {
+      .agrid {
         grid-template-columns: 1fr
       }
     }
 
     .ac {
-      background: var(--card);
+      background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: var(--r);
-      padding: 16px
+      border-radius: var(--r2);
+      padding: 14px
     }
 
     .at {
@@ -506,7 +674,7 @@
       font-weight: 600;
       color: var(--ink3);
       letter-spacing: .04em;
-      margin-bottom: 12px
+      margin-bottom: 10px
     }
 
     .sr {
@@ -544,28 +712,6 @@
       color: var(--red)
     }
 
-    .spin {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border: 2px solid var(--line2);
-      border-top-color: var(--blue);
-      border-radius: 50%;
-      animation: sp .6s linear infinite
-    }
-
-    @keyframes sp {
-      to {
-        transform: rotate(360deg)
-      }
-    }
-
-    @media(prefers-reduced-motion:reduce) {
-      .spin {
-        animation: none
-      }
-    }
-
     .ql {
       width: 100%;
       border-collapse: collapse;
@@ -598,166 +744,321 @@
     .ql .miss {
       color: var(--amber)
     }
+
+    .spin {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--line2);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: sp .6s linear infinite
+    }
+
+    @keyframes sp {
+      to {
+        transform: rotate(360deg)
+      }
+    }
   </style>
 </head>
 
 <body>
-  <div class="topbar">
-    <div class="logo">Multi-Tenant Aggregation <span>Layer</span></div>
-    <span class="badge">v2.1</span>
-    <div class="topbar-right">
-      <div class="fdot" id="fd"></div>
-      <span class="ftxt" id="ft">—</span>
-      <div class="hpill ok" id="hp" onclick="loadHealth()">
-        <span id="hi">✓</span> <span id="ht">healthy</span>
-      </div>
-    </div>
-  </div>
 
-  <div class="controls">
-    <label>Scope</label>
-    <select id="scopeSel">
-      <option value="all">All tenants (Platform)</option>
-      <option value="1" selected>Tenant 1</option>
-    </select>
-    <div class="sep"></div>
-    <label>From</label><input type="date" id="dtF" value="2025-01-01">
-    <label>To</label><input type="date" id="dtT" value="2026-10-31">
-    <div class="sep"></div>
-    <label>Trend</label>
-    <div class="pg">
-      <button class="on" id="gDay" onclick="setG('day')">Daily</button>
-      <button id="gHour" onclick="setG('hour')">Hourly</button>
-    </div>
-    <div class="pg">
-      <button class="on" id="mOrders" onclick="setM('orders')">Orders</button>
-      <button id="mRevenue" onclick="setM('revenue')">Revenue</button>
-      <button id="mUnits" onclick="setM('units')">Units</button>
-    </div>
-    <div class="sep"></div>
-    <button class="btn" onclick="loadAll()">Refresh</button>
-    <button class="btn g" id="adminBtn" onclick="toggleAdmin()">Admin ▾</button>
-  </div>
+  <!-- LOGIN -->
+  <div id="loginWrap">
 
-  <div class="main">
-    <div class="krow">
-      <div class="kpi" style="--ac:var(--blue)">
-        <div class="kl">Total orders</div>
-        <div class="kv" id="ko">—</div>
-        <div class="ks" id="kos"></div>
-        <div class="kms" id="kom"></div>
-      </div>
-      <div class="kpi" style="--ac:var(--green)">
-        <div class="kl">Gross revenue</div>
-        <div class="kv" id="kr">—</div>
-        <div class="ks" id="krs"></div>
-        <div class="kms" id="krm"></div>
-      </div>
-      <div class="kpi" style="--ac:var(--amber)">
-        <div class="kl">Units</div>
-        <div class="kv" id="ku">—</div>
-        <div class="ks" id="kus"></div>
-        <div class="kms" id="kum"></div>
-      </div>
-      <div class="kpi" style="--ac:#a78bfa">
-        <div class="kl">Avg order value</div>
-        <div class="kv" id="ka">—</div>
-        <div class="ks" id="kas"></div>
-        <div class="kms" id="kam"></div>
-      </div>
-    </div>
-
-    <div class="crow">
-      <div class="cc">
-        <div class="ch"><span class="ct" id="tTitle">Performance trend</span><span class="cms" id="tMs"></span></div>
-        <div class="cwrap"><canvas id="tChart"></canvas></div>
-      </div>
-      <div class="cc">
-        <div class="ch">
-          <span class="ct">Breakdown</span>
-          <div class="pg" style="margin-left:auto">
-            <button class="on" id="bdS" onclick="setBd('status')">Status</button>
-            <button id="bdC" onclick="setBd('category')">Category</button>
+    <!-- Role choice -->
+    <div class="lbox" id="roleChoice">
+      <div class="ltitle">Multi-Tenant Aggregation <span>Layer</span></div>
+      <div class="lsub">Choose how you want to sign in</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <button class="rolecard" onclick="pickRole('tenant')">
+          <div class="ricon" style="background:var(--bdim);color:var(--blue)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
           </div>
-          <span class="cms" id="bdMs"></span>
-        </div>
-        <div class="bdw">
-          <div class="dw"><canvas id="dChart"></canvas></div>
-          <div class="bleg" id="bleg"></div>
-        </div>
+          <div style="text-align:left">
+            <div style="font-size:13px;font-weight:600;color:var(--ink)">Tenant</div>
+            <div style="font-size:11px;color:var(--ink3)">View your own store's analytics</div>
+          </div>
+        </button>
+        <button class="rolecard" onclick="pickRole('admin')">
+          <div class="ricon" style="background:rgba(245,166,35,.12);color:var(--amber)">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+            </svg>
+          </div>
+          <div style="text-align:left">
+            <div style="font-size:13px;font-weight:600;color:var(--ink)">Admin</div>
+            <div style="font-size:11px;color:var(--ink3)">Platform-wide view across all tenants</div>
+          </div>
+        </button>
       </div>
     </div>
 
-    <div class="cc">
-      <div class="ch"><span class="ct">Top 10 products by revenue</span><span class="cms" id="topMs"></span></div>
-      <div class="pl" id="pList"></div>
+    <!-- Tenant login -->
+    <div class="lbox" id="tenantLogin" style="display:none">
+      <button class="backbtn" onclick="backToRole()">← Back</button>
+      <div class="ltitle">Tenant <span>Sign in</span></div>
+      <div class="lsub">Enter your tenant credentials</div>
+      <label class="lfield">Tenant ID</label>
+      <input class="linput" type="number" id="lTid" placeholder="e.g. 1" min="1">
+      <label class="lfield">Password</label>
+      <div style="position:relative">
+        <input class="linput" type="password" id="lPwd" placeholder="e.g. tenant1" style="padding-right:40px"
+          onkeydown="if(event.key==='Enter')doLogin()">
+        <button type="button" id="eyeBtn" onclick="togglePwd()" aria-label="Show password"
+          style="position:absolute;right:8px;top:7px;background:none;border:none;color:var(--ink3);cursor:pointer;padding:4px;line-height:0;display:flex;align-items:center">
+          <svg id="eyeOpen" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <svg id="eyeClosed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+            <path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+            <line x1="2" y1="2" x2="22" y2="22" />
+          </svg>
+        </button>
+      </div>
+      <button class="lbtn" id="lBtn" onclick="doLogin()">Sign in →</button>
+      <div class="lerr" id="lErr"></div>
+      <div class="lhint">Default: tenant ID = 1 · password = tenant1</div>
     </div>
 
-    <div class="vbar">
-      <button class="btn" onclick="runV()">Verify correctness</button>
-      <span class="vr" id="vr">Click to probe rollup vs direct DB</span>
-      <span style="font-size:11px;color:var(--ink3);margin-left:auto">
-        Isolation: <span id="isoT"
-          style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink2)"></span>
-      </span>
+    <!-- Admin login -->
+    <div class="lbox" id="adminLogin" style="display:none">
+      <button class="backbtn" onclick="backToRole()">← Back</button>
+      <div class="ltitle">Admin <span>Sign in</span></div>
+      <div class="lsub">Platform operator access</div>
+      <label class="lfield">Admin password</label>
+      <div style="position:relative">
+        <input class="linput" type="password" id="aPwd" placeholder="admin password" style="padding-right:40px"
+          onkeydown="if(event.key==='Enter')doAdminLogin()">
+        <button type="button" id="aEyeBtn" onclick="toggleAPwd()" aria-label="Show password"
+          style="position:absolute;right:8px;top:7px;background:none;border:none;color:var(--ink3);cursor:pointer;padding:4px;line-height:0;display:flex;align-items:center">
+          <svg id="aEyeOpen" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <svg id="aEyeClosed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+            <path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+            <line x1="2" y1="2" x2="22" y2="22" />
+          </svg>
+        </button>
+      </div>
+      <button class="lbtn" id="aBtn" onclick="doAdminLogin()">Sign in →</button>
+      <div class="lerr" id="aErr"></div>
+      <div class="lhint">Default admin password: admin</div>
     </div>
 
-    <div class="arow" id="aRow" style="display:none">
-      <div class="ac">
-        <div class="at">SYSTEM HEALTH</div>
-        <div class="sr"><span class="sk">Redis</span><span class="sv ok" id="hR">—</span></div>
-        <div class="sr"><span class="sk">Refresh lag</span><span class="sv" id="hL">—</span></div>
-        <div class="sr"><span class="sk">Drift detected</span><span class="sv ok" id="hD">—</span></div>
-        <div class="sr"><span class="sk">Last drift check</span><span class="sv" id="hDA">—</span></div>
-        <div class="sr"><span class="sk">Buckets sampled</span><span class="sv" id="hBS">—</span></div>
-        <div class="sr"><span class="sk">Pool used/total</span><span class="sv" id="hP">—</span></div>
-        <button class="btn g" style="margin-top:10px;width:100%" onclick="runDrift()">Run drift check now</button>
-      </div>
-      <div class="ac">
-        <div class="at">SCALE REPORT</div>
-        <div class="sr"><span class="sk">Base rows</span><span class="sv" id="sB">—</span></div>
-        <div class="sr"><span class="sk">Daily rollup</span><span class="sv" id="sD">—</span></div>
-        <div class="sr"><span class="sk">Product rollup</span><span class="sv" id="sP">—</span></div>
-        <div class="sr"><span class="sk">Hourly rollup</span><span class="sv" id="sH">—</span></div>
-        <div class="sr"><span class="sk">Compression</span><span class="sv ok" id="sR">—</span></div>
-        <div class="sr"><span class="sk">Sample query</span><span class="sv ok" id="sMs">—</span></div>
-      </div>
-      <div class="ac">
-        <div class="at">QUERY LOG</div>
-        <div class="sr"><span class="sk">Total</span><span class="sv" id="qT">—</span></div>
-        <div class="sr"><span class="sk">Cache hit rate</span><span class="sv ok" id="qH">—</span></div>
-        <div class="sr"><span class="sk">p50</span><span class="sv ok" id="qP50">—</span></div>
-        <div class="sr"><span class="sk">p99</span><span class="sv" id="qP99">—</span></div>
-        <div style="margin-top:10px;overflow:auto;max-height:130px">
-          <table class="ql">
-            <thead>
-              <tr>
-                <th>time</th>
-                <th>tenant</th>
-                <th>endpoint</th>
-                <th>ms</th>
-                <th>cache</th>
-              </tr>
-            </thead>
-            <tbody id="qBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
   </div>
+
+  <!-- APP -->
+  <div id="app" style="display:none">
+
+    <div class="topbar">
+      <div class="logo">Multi-Tenant Aggregation <span>Layer</span></div>
+      <span class="badge">v2.2</span>
+      <div class="tr">
+        <div class="fdot" id="fd"></div>
+        <span class="ftxt" id="ft">—</span>
+        <div class="hpill ok" id="hp"><span id="hi">✓</span> <span id="ht">healthy</span></div>
+        <div class="tpill" id="tpill">—</div>
+        <button class="outbtn" id="outBtn" onclick="doLogout()">Sign out</button>
+      </div>
+    </div>
+
+    <div class="ctrl">
+      <label>Scope</label>
+      <select id="scopeSel">
+        <option value="1">Tenant 1</option>
+      </select>
+      <div class="sep"></div>
+      <label>From</label><input type="date" id="dtF" value="2025-01-01">
+      <label>To</label><input type="date" id="dtT" value="2026-10-31">
+      <div class="sep"></div>
+      <label>Trend</label>
+      <div class="pg">
+        <button class="on" id="gDay">Daily</button>
+        <button id="gHour">Hourly</button>
+      </div>
+      <div class="pg">
+        <button class="on" id="mOrders">Orders</button>
+        <button id="mRevenue">Revenue</button>
+        <button id="mUnits">Units</button>
+      </div>
+      <div class="sep"></div>
+      <button class="btn" id="refBtn">Refresh</button>
+      <button class="btn g" id="adminBtn">Admin ▾</button>
+    </div>
+
+    <div class="main">
+      <div class="krow">
+        <div class="kpi" style="--ac:var(--blue)">
+          <div class="kl">Total orders</div>
+          <div class="kv" id="ko">—</div>
+          <div class="ks" id="kos"></div>
+          <div class="kms" id="kom"></div>
+        </div>
+        <div class="kpi" style="--ac:var(--green)">
+          <div class="kl">Gross revenue</div>
+          <div class="kv" id="kr">—</div>
+          <div class="ks" id="krs"></div>
+          <div class="kms" id="krm"></div>
+        </div>
+        <div class="kpi" style="--ac:var(--amber)">
+          <div class="kl">Units</div>
+          <div class="kv" id="ku">—</div>
+          <div class="ks" id="kus"></div>
+          <div class="kms" id="kum"></div>
+        </div>
+        <div class="kpi" style="--ac:var(--purple)">
+          <div class="kl">Avg order value</div>
+          <div class="kv" id="ka">—</div>
+          <div class="ks" id="kas"></div>
+          <div class="kms" id="kam"></div>
+        </div>
+      </div>
+
+      <div class="crow">
+        <div class="cc">
+          <div class="ch"><span class="ct" id="tTitle">Orders trend (day)</span><span class="cms" id="tMs"></span></div>
+          <div class="cwrap"><canvas id="tChart"></canvas></div>
+        </div>
+        <div class="cc">
+          <div class="ch">
+            <span class="ct">Breakdown</span>
+            <div class="pg" style="margin-left:auto">
+              <button class="on" id="bdS">Status</button>
+              <button id="bdC">Category</button>
+            </div>
+            <span class="cms" id="bdMs"></span>
+          </div>
+          <div class="bdw">
+            <div class="dw"><canvas id="dChart"></canvas></div>
+            <div class="bleg" id="bleg"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cc">
+        <div class="ch"><span class="ct">Top 10 products by revenue</span><span class="cms" id="topMs"></span></div>
+        <div class="pl" id="pList"></div>
+      </div>
+
+      <div class="vbar">
+        <button class="btn" id="verBtn">Verify correctness</button>
+        <span class="vr" id="vr">Click to probe rollup vs direct DB</span>
+        <span style="font-size:11px;color:var(--ink3);margin-left:auto">
+          Isolation: <span id="isoT"
+            style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink2)"></span>
+        </span>
+      </div>
+
+      <!-- ADMIN PANEL -->
+      <div class="apanel" id="adminPanel" style="display:none">
+
+        <!-- View toggle: My Tenant / All Tenants -->
+        <div class="atoggle">
+          <span style="font-size:12px;color:var(--ink3);font-weight:500">View</span>
+          <div class="pg">
+            <button class="on" id="vMine">My Tenant</button>
+            <button id="vAll">All Tenants (Platform)</button>
+          </div>
+          <span style="font-size:11px;color:var(--ink3);margin-left:6px" id="vHint">Your tenant data</span>
+        </div>
+
+        <!-- Leaderboard (shown when All Tenants active) -->
+        <div id="lbCard" style="display:none">
+          <div class="ch" style="margin-bottom:10px">
+            <span class="ct">Platform leaderboard — top 10 tenants by revenue</span>
+            <span class="cms" id="lbMs"></span>
+          </div>
+          <div style="overflow:auto;max-height:220px">
+            <table class="ql">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Tenant</th>
+                  <th>Orders</th>
+                  <th>Revenue</th>
+                  <th>Units</th>
+                </tr>
+              </thead>
+              <tbody id="lbBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- System Health + Scale + Query Log -->
+        <div class="agrid">
+          <div class="ac">
+            <div class="at">SYSTEM HEALTH</div>
+            <div class="sr"><span class="sk">Redis</span><span class="sv ok" id="hR">—</span></div>
+            <div class="sr"><span class="sk">Refresh lag</span><span class="sv" id="hL">—</span></div>
+            <div class="sr"><span class="sk">Drift detected</span><span class="sv ok" id="hD">—</span></div>
+            <div class="sr"><span class="sk">Last drift check</span><span class="sv" id="hDA">—</span></div>
+            <div class="sr"><span class="sk">Buckets sampled</span><span class="sv" id="hBS">—</span></div>
+            <div class="sr"><span class="sk">Pool used/total</span><span class="sv" id="hP">—</span></div>
+            <button class="btn g" style="margin-top:10px;width:100%" id="driftBtn">Run drift check</button>
+          </div>
+          <div class="ac">
+            <div class="at">SCALE REPORT</div>
+            <div class="sr"><span class="sk">Base rows</span><span class="sv" id="sB">—</span></div>
+            <div class="sr"><span class="sk">Daily rollup</span><span class="sv" id="sD">—</span></div>
+            <div class="sr"><span class="sk">Product rollup</span><span class="sv" id="sP">—</span></div>
+            <div class="sr"><span class="sk">Hourly rollup</span><span class="sv" id="sH">—</span></div>
+            <div class="sr"><span class="sk">Compression</span><span class="sv ok" id="sR">—</span></div>
+            <div class="sr"><span class="sk">Sample query</span><span class="sv ok" id="sMs">—</span></div>
+          </div>
+          <div class="ac">
+            <div class="at">QUERY LOG</div>
+            <div class="sr"><span class="sk">Total queries</span><span class="sv" id="qT">—</span></div>
+            <div class="sr"><span class="sk">Cache hit rate</span><span class="sv ok" id="qH">—</span></div>
+            <div class="sr"><span class="sk">p50 latency</span><span class="sv ok" id="qP50">—</span></div>
+            <div class="sr"><span class="sk">p99 latency</span><span class="sv" id="qP99">—</span></div>
+            <div style="margin-top:10px;overflow:auto;max-height:130px">
+              <table class="ql">
+                <thead>
+                  <tr>
+                    <th>time</th>
+                    <th>tenant</th>
+                    <th>endpoint</th>
+                    <th>ms</th>
+                    <th>cache</th>
+                  </tr>
+                </thead>
+                <tbody id="qBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div><!-- /adminPanel -->
+
+    </div><!-- /main -->
+  </div><!-- /app -->
 
   <script>
-    const S = { scope: '1', from: '2025-01-01', to: '2026-10-31', gran: 'day', metric: 'orders', bd: 'status', admin: false };
-    const COLORS = ['#2ec990', '#2d7ef7', '#f5a623', '#e85d5d', '#a78bfa', '#38bdf8', '#fb7185', '#34d399'];
-    const CHO = {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
-      scales: {
-        x: { grid: { color: '#1e2d3d' }, ticks: { color: '#5a7a96', maxTicksLimit: 8, font: { size: 11 } } },
-        y: { grid: { color: '#1e2d3d' }, ticks: { color: '#5a7a96', font: { size: 11 } } }
-      }
+    // ── state ──────────────────────────────────────────────────────────────────
+    const A = { token: null, tid: null, isAdmin: false };
+    const S = {
+      scope: '1', from: '2025-01-01', to: '2026-10-31',
+      gran: 'day', metric: 'orders', bd: 'status', admin: false
     };
-    let TC = new Chart(document.getElementById('tChart'), {
+    const COLORS = ['#2ec990', '#2d7ef7', '#f5a623', '#e85d5d', '#a78bfa', '#38bdf8', '#fb7185', '#34d399'];
+
+    // ── charts ─────────────────────────────────────────────────────────────────
+    const TCH = new Chart(document.getElementById('tChart'), {
       type: 'line',
       data: {
         labels: [], datasets: [{
@@ -765,9 +1066,17 @@
           fill: true, tension: .3, pointRadius: 0, borderWidth: 2
         }]
       },
-      options: { ...CHO, animation: { duration: 400 } }
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 400 },
+        plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+        scales: {
+          x: { grid: { color: '#1e2d3d' }, ticks: { color: '#5a7a96', maxTicksLimit: 8, font: { size: 11 } } },
+          y: { grid: { color: '#1e2d3d' }, ticks: { color: '#5a7a96', font: { size: 11 } } }
+        }
+      }
     });
-    let DC = new Chart(document.getElementById('dChart'), {
+    const DCH = new Chart(document.getElementById('dChart'), {
       type: 'doughnut',
       data: { labels: [], datasets: [{ data: [], backgroundColor: COLORS, borderWidth: 0, hoverOffset: 4 }] },
       options: {
@@ -776,6 +1085,7 @@
       }
     });
 
+    // ── format helpers ─────────────────────────────────────────────────────────
     function fN(n) { return n == null ? '—' : Number(n).toLocaleString('en-IN') }
     function fR(n) {
       if (n == null) return '—'; const v = Number(n);
@@ -784,77 +1094,197 @@
       return '₹' + fN(Math.round(v));
     }
     function fM(ms) { return ms != null ? ms + ' ms' : '' }
-
     function base() { return S.scope === 'all' ? '/platform' : `/tenants/${S.scope}` }
     function qs(x = '') { return `?from=${S.from}&to=${S.to}${x}` }
-    async function api(p, o) {
-      // add _t= to bust browser cache on every call
-      const sep = p.includes('?') ? '&' : '?';
-      const url = p + (o && o.method === 'POST' ? '' : sep + '_t=' + Date.now());
-      const r = await fetch(url, o); if (!r.ok) throw new Error(r.status); return r.json();
+
+    // ── api fetch ─────────────────────────────────────────────────────────────
+    async function api(path, opts = {}) {
+      const hdrs = { ...(opts.headers || {}) };
+      if (A.token && path.includes('/tenants/')) hdrs['Authorization'] = 'Bearer ' + A.token;
+      const sep = path.includes('?') ? '&' : '?';
+      const url = path + (opts.method === 'POST' ? '' : sep + '_t=' + Date.now());
+      const r = await fetch(url, { ...opts, headers: hdrs });
+      if (r.status === 401) { doLogout(); throw new Error('401'); }
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
     }
 
+    // ── login / logout ─────────────────────────────────────────────────────────
+    async function doLogin() {
+      const tid = parseInt(document.getElementById('lTid').value);
+      const pwd = document.getElementById('lPwd').value.trim();
+      const err = document.getElementById('lErr');
+      err.textContent = '';
+      if (!tid || !pwd) { err.textContent = 'Enter tenant ID and password.'; return; }
+      try {
+        const r = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tenant_id: tid, password: pwd })
+        });
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          err.textContent = e.detail || 'Invalid credentials.'; return;
+        }
+        const d = await r.json();
+        A.token = d.access_token; A.tid = d.tenant_id;
+        document.getElementById('loginWrap').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        document.getElementById('tpill').textContent = 'Tenant ' + A.tid;
+        const sel = document.getElementById('scopeSel');
+        sel.innerHTML = `<option value="${A.tid}" selected>Tenant ${A.tid}</option>`;
+        S.scope = String(A.tid);
+        initApp();
+      } catch (e) { document.getElementById('lErr').textContent = 'Network error.'; }
+    }
+
+    function doLogout() {
+      A.token = null; A.tid = null; A.isAdmin = false;
+      document.getElementById('loginWrap').style.display = 'flex';
+      document.getElementById('app').style.display = 'none';
+      backToRole();
+    }
+
+    function pickRole(role) {
+      document.getElementById('roleChoice').style.display = 'none';
+      document.getElementById('tenantLogin').style.display = role === 'tenant' ? 'block' : 'none';
+      document.getElementById('adminLogin').style.display = role === 'admin' ? 'block' : 'none';
+    }
+    function backToRole() {
+      document.getElementById('roleChoice').style.display = 'block';
+      document.getElementById('tenantLogin').style.display = 'none';
+      document.getElementById('adminLogin').style.display = 'none';
+    }
+    function toggleAPwd() {
+      const inp = document.getElementById('aPwd');
+      const o = document.getElementById('aEyeOpen'), c = document.getElementById('aEyeClosed');
+      if (inp.type === 'password') { inp.type = 'text'; o.style.display = 'none'; c.style.display = 'block'; }
+      else { inp.type = 'password'; o.style.display = 'block'; c.style.display = 'none'; }
+    }
+
+    async function doAdminLogin() {
+      const pwd = document.getElementById('aPwd').value.trim();
+      const err = document.getElementById('aErr');
+      err.textContent = '';
+      // Simple client-side admin check (demo). Platform endpoints are open anyway.
+      if (pwd !== 'admin') { err.textContent = 'Invalid admin password.'; return; }
+      A.isAdmin = true; A.tid = null; A.token = null;
+      document.getElementById('loginWrap').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      document.getElementById('tpill').textContent = 'Admin · Platform';
+      // Admin sees platform view directly
+      S.scope = 'all';
+      const sel = document.getElementById('scopeSel');
+      sel.innerHTML = `<option value="all" selected>All Tenants (Platform)</option>`;
+      initApp();
+      // open admin panel + leaderboard by default
+      S.admin = true;
+      document.getElementById('adminPanel').style.display = 'flex';
+      document.getElementById('adminBtn').classList.add('on');
+      document.getElementById('adminBtn').textContent = 'Admin ▴';
+      document.getElementById('vAll').classList.add('on');
+      document.getElementById('vMine').classList.remove('on');
+      document.getElementById('vMine').style.display = 'none'; // admin can't go to a single tenant
+      document.getElementById('vHint').textContent = 'Platform-wide data';
+      document.getElementById('lbCard').style.display = 'block';
+      loadLeaderboard();
+      loadAdminData();
+    }
+
+    function togglePwd() {
+      const inp = document.getElementById('lPwd');
+      const open = document.getElementById('eyeOpen');
+      const closed = document.getElementById('eyeClosed');
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        open.style.display = 'none';
+        closed.style.display = 'block';
+      } else {
+        inp.type = 'password';
+        open.style.display = 'block';
+        closed.style.display = 'none';
+      }
+    }
+
+    function initApp() {
+      loadAll();
+      setInterval(loadFreshness, 5000);
+      setInterval(loadHealth, 15000);
+    }
+
+    // ── data loaders ──────────────────────────────────────────────────────────
     async function loadAll() {
       document.getElementById('isoT').textContent =
         S.scope === 'all' ? '/platform/* (all tenants)' : `/tenants/${S.scope}/* (isolated)`;
       await Promise.all([loadKPIs(), loadTrend(), loadBd(), loadTop()]);
-      loadFreshness(); if (S.admin) loadAdmin();
+      loadFreshness();
+      if (S.admin) loadAdminData();
     }
 
     async function loadKPIs() {
-      const [cnt, aov] = await Promise.all([api(`${base()}/orders/count${qs()}`),
-      api(`${base()}/metrics/avg_order_value${qs()}`)]);
-      document.getElementById('ko').textContent = fN(cnt.orders);
-      document.getElementById('kr').textContent = fR(cnt.revenue);
-      document.getElementById('ku').textContent = fN(cnt.units);
-      document.getElementById('ka').textContent = fR(aov.value);
-      document.getElementById('kom').textContent = fM(cnt.query_ms);
-      document.getElementById('krm').textContent = fM(cnt.query_ms);
-      document.getElementById('kum').textContent = fM(cnt.query_ms);
-      document.getElementById('kam').textContent = fM(aov.query_ms);
-      const c = cnt.cached ? '● cached' : '○ live rollup';
-      document.getElementById('kos').textContent = c;
-      document.getElementById('krs').textContent = c;
+      try {
+        const [cnt, aov] = await Promise.all([
+          api(`${base()}/orders/count${qs()}`),
+          api(`${base()}/metrics/avg_order_value${qs()}`),
+        ]);
+        document.getElementById('ko').textContent = fN(cnt.orders);
+        document.getElementById('kr').textContent = fR(cnt.revenue);
+        document.getElementById('ku').textContent = fN(cnt.units);
+        document.getElementById('ka').textContent = fR(aov.value);
+        document.getElementById('kom').textContent = fM(cnt.query_ms);
+        document.getElementById('krm').textContent = fM(cnt.query_ms);
+        document.getElementById('kum').textContent = fM(cnt.query_ms);
+        document.getElementById('kam').textContent = fM(aov.query_ms);
+        const c = cnt.cached ? '● cached' : '○ live rollup';
+        document.getElementById('kos').textContent = c;
+        document.getElementById('krs').textContent = c;
+      } catch (e) { }
     }
 
     async function loadTrend() {
-      const g = S.gran === 'hour' ? '&granularity=hour' : '';
-      const f = S.gran === 'hour' ? S.to : S.from;
-      const d = await api(`${base()}/orders/trend?from=${f}&to=${S.to}&metric=${S.metric}${g}`);
-      const k = S.gran === 'hour' ? 'hour' : 'day';
-      TC.data.labels = d.series.map(p => (p[k] || '').slice(5, 13));
-      TC.data.datasets[0].data = d.series.map(p => p.value);
-      TC.options.scales.y.ticks.callback = S.metric === 'revenue'
-        ? v => '₹' + (v / 1e5).toFixed(0) + 'L' : v => fN(v);
-      TC.update();
-      document.getElementById('tTitle').textContent =
-        `${S.metric.charAt(0).toUpperCase() + S.metric.slice(1)} trend (${S.gran})`;
-      document.getElementById('tMs').textContent = fM(d.query_ms);
+      try {
+        const g = S.gran === 'hour' ? '&granularity=hour' : '';
+        const f = S.gran === 'hour' ? S.to : S.from;
+        const d = await api(`${base()}/orders/trend?from=${f}&to=${S.to}&metric=${S.metric}${g}`);
+        const k = S.gran === 'hour' ? 'hour' : 'day';
+        TCH.data.labels = d.series.map(p => (p[k] || '').slice(5, 13));
+        TCH.data.datasets[0].data = d.series.map(p => p.value);
+        TCH.options.scales.y.ticks.callback = S.metric === 'revenue'
+          ? v => '₹' + (v / 1e5).toFixed(0) + 'L' : v => fN(v);
+        TCH.update();
+        document.getElementById('tTitle').textContent =
+          `${S.metric.charAt(0).toUpperCase() + S.metric.slice(1)} trend (${S.gran})`;
+        document.getElementById('tMs').textContent = fM(d.query_ms);
+      } catch (e) { }
     }
 
     async function loadBd() {
-      const d = await api(`${base()}/orders/breakdown?by=${S.bd}&from=${S.from}&to=${S.to}`);
-      DC.data.labels = d.breakdown.map(b => b.key);
-      DC.data.datasets[0].data = d.breakdown.map(b => b.orders);
-      DC.update();
-      const tot = d.breakdown.reduce((a, b) => a + b.orders, 0);
-      document.getElementById('bleg').innerHTML = d.breakdown.map((b, i) => `
-    <div class="li"><div class="ld" style="background:${COLORS[i % COLORS.length]}"></div>
-    <span class="ll">${b.key}</span>
-    <span class="lv">${tot ? (b.orders / tot * 100).toFixed(1) : 0}%</span></div>`).join('');
-      document.getElementById('bdMs').textContent = fM(d.query_ms);
+      try {
+        const d = await api(`${base()}/orders/breakdown?by=${S.bd}&from=${S.from}&to=${S.to}`);
+        DCH.data.labels = d.breakdown.map(b => b.key);
+        DCH.data.datasets[0].data = d.breakdown.map(b => b.orders);
+        DCH.update();
+        const tot = d.breakdown.reduce((a, b) => a + b.orders, 0);
+        document.getElementById('bleg').innerHTML = d.breakdown.map((b, i) => `
+      <div class="li"><div class="ld" style="background:${COLORS[i % COLORS.length]}"></div>
+      <span class="ll">${b.key}</span>
+      <span class="lv">${tot ? (b.orders / tot * 100).toFixed(1) : 0}%</span></div>`).join('');
+        document.getElementById('bdMs').textContent = fM(d.query_ms);
+      } catch (e) { }
     }
 
     async function loadTop() {
-      const d = await api(`${base()}/products/top?n=10&by=revenue${qs()}`);
-      const mx = d.top[0]?.revenue || 1;
-      document.getElementById('pList').innerHTML = d.top.map(p => `
-    <div class="pi">
-      <span class="pn" title="${p.product_name}">${p.product_name}</span>
-      <div class="pbw"><div class="pb" style="width:${(p.revenue / mx * 100).toFixed(1)}%"></div></div>
-      <span class="pv">${fR(p.revenue)}</span>
-    </div>`).join('');
-      document.getElementById('topMs').textContent = fM(d.query_ms);
+      try {
+        const d = await api(`${base()}/products/top?n=10&by=revenue${qs()}`);
+        const mx = d.top[0]?.revenue || 1;
+        document.getElementById('pList').innerHTML = d.top.map(p => `
+      <div class="pi">
+        <span class="pn" title="${p.product_name}">${p.product_name}</span>
+        <div class="pbw"><div class="pb" style="width:${(p.revenue / mx * 100).toFixed(1)}%"></div></div>
+        <span class="pv">${fR(p.revenue)}</span>
+      </div>`).join('');
+        document.getElementById('topMs').textContent = fM(d.query_ms);
+      } catch (e) { }
     }
 
     async function loadFreshness() {
@@ -864,6 +1294,7 @@
         document.getElementById('fd').classList.toggle('stale', (d.refresh_lag_seconds || 0) > 30);
       } catch (e) { }
     }
+
     async function loadHealth() {
       try {
         const d = await api('/health');
@@ -883,19 +1314,10 @@
       } catch (e) { }
     }
 
-    async function runV() {
-      const el = document.getElementById('vr');
-      el.className = 'vr'; el.innerHTML = '<span class="spin"></span> probing…';
-      try {
-        const d = await api(`${base()}/orders/count${qs()}`);
-        el.className = 'vr ok';
-        el.textContent = `✓ rollups in ${d.query_ms} ms — ${fN(d.orders)} orders · ${fR(d.revenue)}${d.cached ? ' (cache hit)' : ''}`;
-      } catch (e) { el.className = 'vr bad'; el.textContent = 'error: ' + e.message }
-    }
-
-    async function loadAdmin() {
+    async function loadAdminData() {
       await Promise.all([loadHealth(), loadScale(), loadQStats()]);
     }
+
     async function loadScale() {
       try {
         const d = await api('/admin/scale-report');
@@ -907,6 +1329,7 @@
         document.getElementById('sMs').textContent = d.sample_query_ms + ' ms';
       } catch (e) { }
     }
+
     async function loadQStats() {
       try {
         const [s, l] = await Promise.all([api('/admin/query-stats'), api('/admin/query-log?limit=8')]);
@@ -920,80 +1343,121 @@
        <td class="${e.cached ? 'ok' : 'miss'}">${e.cached ? 'hit' : 'miss'}</td></tr>`).join('');
       } catch (e) { }
     }
-    async function runDrift() {
-      document.getElementById('hD').textContent = '…';
-      try {
-        const d = await fetch('/admin/drift-check', { method: 'POST' }).then(r => r.json());
-        document.getElementById('hD').textContent = d.drift_detected ? `YES ⚠ (${d.mismatch_count})` : 'none ✓';
-        document.getElementById('hD').className = 'sv ' + (d.drift_detected ? 'bad' : 'ok');
-        document.getElementById('hBS').textContent = d.buckets_sampled;
-      } catch (e) { }
-    }
-    function toggleAdmin() {
-      S.admin = !S.admin;
-      document.getElementById('aRow').style.display = S.admin ? 'grid' : 'none';
-      if (S.admin) loadAdmin();
-    }
-    function setG(g) {
-      S.gran = g;['gDay', 'gHour'].forEach(i => document.getElementById(i).classList.remove('on'));
-      document.getElementById(g === 'day' ? 'gDay' : 'gHour').classList.add('on'); loadTrend()
-    }
-    function setM(m) {
-      S.metric = m;['mOrders', 'mRevenue', 'mUnits'].forEach(i => document.getElementById(i).classList.remove('on'));
-      document.getElementById('m' + m.charAt(0).toUpperCase() + m.slice(1)).classList.add('on'); loadTrend()
-    }
-    function setBd(b) {
-      S.bd = b;['bdS', 'bdC'].forEach(i => document.getElementById(i).classList.remove('on'));
-      document.getElementById(b === 'status' ? 'bdS' : 'bdC').classList.add('on'); loadBd()
-    }
-    document.getElementById('scopeSel').onchange = e => { S.scope = e.target.value; loadAll() };
-    document.getElementById('dtF').onchange = e => { S.from = e.target.value; loadAll() };
-    document.getElementById('dtT').onchange = e => { S.to = e.target.value; loadAll() };
-    // Dynamically load tenants from /platform/tenants
-    async function loadTenantDropdown() {
-      try {
-        const d = await api('/platform/tenants?from=2024-01-01&to=2026-12-31');
-        const sel = document.getElementById('scopeSel');
-        // keep "All tenants" option, rebuild the rest
-        sel.innerHTML = '<option value="all">All tenants (Platform)</option>';
-        (d.tenants || []).forEach((t, i) => {
-          const opt = document.createElement('option');
-          opt.value = t.tenant_id;
-          opt.textContent = `Tenant ${t.tenant_id}`;
-          if (i === 0) opt.selected = true;
-          sel.appendChild(opt);
-        });
-        // set state to first tenant
-        if (d.tenants && d.tenants.length > 0) {
-          S.scope = String(d.tenants[0].tenant_id);
-        }
-      } catch (e) {
-        console.warn('Could not load tenants dynamically, using default', e);
-      }
-    }
-    loadTenantDropdown().then(() => loadAll());
-    setInterval(loadHealth, 15000);
 
-    // Smart refresh: poll /freshness every 5s.
-    // Only reload widgets when the worker actually updated rollups (xid_snap changed).
-    // Zero extra DB calls when nothing changed — no overkill.
-    let _lastSnap = null;
-    async function smartPoll() {
+    async function loadLeaderboard() {
       try {
-        const d = await api('/freshness');
-        const snap = d.last_xid_snap;
-        const lag = d.refresh_lag_seconds ?? 999;
-        // update freshness badge
-        document.getElementById('ft').textContent = d.updated_ago || '—';
-        document.getElementById('fd').classList.toggle('stale', lag > 30);
-        // only reload widgets if rollups actually changed
-        if (_lastSnap !== null && snap !== _lastSnap) {
-          await loadAll();
-        }
-        _lastSnap = snap;
+        const d = await api('/platform/leaderboard?by=revenue&n=10');
+        document.getElementById('lbMs').textContent = fM(d.query_ms);
+        document.getElementById('lbBody').innerHTML = d.leaderboard.map(r => `
+      <tr>
+        <td style="color:var(--amber);font-weight:600">#${r.rank}</td>
+        <td>Tenant ${r.tenant_id}</td>
+        <td>${fN(r.orders)}</td>
+        <td style="color:var(--green)">${fR(r.revenue)}</td>
+        <td>${fN(r.units)}</td>
+      </tr>`).join('');
       } catch (e) { }
     }
-    setInterval(smartPoll, 5000);
+
+    // ── event listeners (attached once DOM is ready) ──────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+
+      // Admin toggle
+      document.getElementById('adminBtn').onclick = function () {
+        S.admin = !S.admin;
+        const panel = document.getElementById('adminPanel');
+        panel.style.display = S.admin ? 'flex' : 'none';
+        this.classList.toggle('on', S.admin);
+        this.textContent = S.admin ? 'Admin ▴' : 'Admin ▾';
+        if (S.admin) {
+          loadAdminData();
+          // scroll admin panel into view so the toggle bar is visible
+          setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+        }
+      };
+
+      // View toggle: My Tenant / All Tenants
+      document.getElementById('vMine').onclick = function () {
+        S.scope = String(A.tid);
+        document.getElementById('scopeSel').innerHTML =
+          `<option value="${A.tid}" selected>Tenant ${A.tid}</option>`;
+        document.getElementById('vMine').classList.add('on');
+        document.getElementById('vAll').classList.remove('on');
+        document.getElementById('vHint').textContent = 'Your tenant data';
+        document.getElementById('lbCard').style.display = 'none';
+        loadAll();
+      };
+
+      document.getElementById('vAll').onclick = function () {
+        S.scope = 'all';
+        document.getElementById('scopeSel').innerHTML =
+          `<option value="all" selected>All Tenants (Platform)</option>`;
+        document.getElementById('vAll').classList.add('on');
+        document.getElementById('vMine').classList.remove('on');
+        document.getElementById('vHint').textContent = 'Platform-wide data';
+        document.getElementById('lbCard').style.display = 'block';
+        loadLeaderboard();
+        loadAll();
+      };
+
+      // Drift check
+      document.getElementById('driftBtn').onclick = async function () {
+        this.textContent = '…checking';
+        try {
+          const d = await fetch('/admin/drift-check', { method: 'POST' }).then(r => r.json());
+          document.getElementById('hD').textContent = d.drift_detected ? `YES ⚠ (${d.mismatch_count})` : 'none ✓';
+          document.getElementById('hD').className = 'sv ' + (d.drift_detected ? 'bad' : 'ok');
+          document.getElementById('hBS').textContent = d.buckets_sampled;
+        } catch (e) { }
+        this.textContent = 'Run drift check';
+      };
+
+      // Refresh button
+      document.getElementById('refBtn').onclick = loadAll;
+
+      // Verify
+      document.getElementById('verBtn').onclick = async function () {
+        const el = document.getElementById('vr');
+        el.className = 'vr'; el.innerHTML = '<span class="spin"></span> probing…';
+        try {
+          const d = await api(`${base()}/orders/count${qs()}`);
+          el.className = 'vr ok';
+          el.textContent = `✓ rollups in ${d.query_ms} ms — ${fN(d.orders)} orders · ${fR(d.revenue)}${d.cached ? ' (cache hit)' : ''}`;
+        } catch (e) { el.className = 'vr bad'; el.textContent = 'error: ' + e.message; }
+      };
+
+      // Trend granularity
+      document.getElementById('gDay').onclick = function () { S.gran = 'day'; this.classList.add('on'); document.getElementById('gHour').classList.remove('on'); loadTrend(); };
+      document.getElementById('gHour').onclick = function () { S.gran = 'hour'; this.classList.add('on'); document.getElementById('gDay').classList.remove('on'); loadTrend(); };
+
+      // Metric
+      document.getElementById('mOrders').onclick = function () { S.metric = 'orders';['mOrders', 'mRevenue', 'mUnits'].forEach(id => document.getElementById(id).classList.remove('on')); this.classList.add('on'); loadTrend(); };
+      document.getElementById('mRevenue').onclick = function () { S.metric = 'revenue';['mOrders', 'mRevenue', 'mUnits'].forEach(id => document.getElementById(id).classList.remove('on')); this.classList.add('on'); loadTrend(); };
+      document.getElementById('mUnits').onclick = function () { S.metric = 'units';['mOrders', 'mRevenue', 'mUnits'].forEach(id => document.getElementById(id).classList.remove('on')); this.classList.add('on'); loadTrend(); };
+
+      // Breakdown
+      document.getElementById('bdS').onclick = function () { S.bd = 'status'; this.classList.add('on'); document.getElementById('bdC').classList.remove('on'); loadBd(); };
+      document.getElementById('bdC').onclick = function () { S.bd = 'category'; this.classList.add('on'); document.getElementById('bdS').classList.remove('on'); loadBd(); };
+
+      // Date pickers
+      document.getElementById('dtF').onchange = e => { S.from = e.target.value; loadAll(); };
+      document.getElementById('dtT').onchange = e => { S.to = e.target.value; loadAll(); };
+      document.getElementById('scopeSel').onchange = e => { S.scope = e.target.value; loadAll(); };
+
+      // Smart freshness poll
+      let _lastSnap = null;
+      async function smartPoll() {
+        try {
+          const d = await api('/freshness');
+          document.getElementById('ft').textContent = d.updated_ago || '—';
+          document.getElementById('fd').classList.toggle('stale', (d.refresh_lag_seconds || 0) > 30);
+          if (_lastSnap !== null && d.last_xid_snap !== _lastSnap) loadAll();
+          _lastSnap = d.last_xid_snap;
+        } catch (e) { }
+      }
+      setInterval(smartPoll, 5000);
+      setInterval(loadHealth, 15000);
+    });
   </script>
 </body>
 
