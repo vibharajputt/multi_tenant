@@ -3,28 +3,27 @@
 > **Fast · Fresh · Correct · Tenant-Isolated · Scalable**
 >
 > A layer between a large multi-tenant `orders` database and dashboards.
-> Answers four dashboard queries for any tenant in **under 200ms**, keeps
-> numbers fresh **within seconds**, never slows the main database, keeps
-> every tenant's data strictly separate, and stays correct at 10M rows.
+> Answers dashboard queries in **under 200ms**, keeps numbers fresh **within seconds**,
+> never slows the main database, and stays correct at 10M rows / 100 tenants.
 
 ---
 
 ## Quick start (any laptop — needs only Docker)
 
 ```bash
-# 1. copy config (edit if needed — defaults work)
+# 1. copy config
 cp .env.example .env
 
 # 2. generate data
 pip install numpy pandas
-python generate_data.py --preset small --out ./out_small       # 1M / 10 tenants
+python generate_data.py --preset small --out ./out_small      # 1M / 10 tenants
 # python generate_data.py --preset main --out ./out_main --workers 8  # 10M / 100 tenants
 
 # 3. start everything
 docker compose up -d --build
 
 # 4. load data + build rollups
-# Mac / Linux:
+# Mac/Linux:
 bash setup.sh
 # Windows PowerShell:
 Get-Content app/rollups.sql | docker compose exec -T db psql -U hackathon -d hackathon
@@ -35,58 +34,174 @@ docker compose run --rm api python -m app.refresh backfill
 docker compose run --rm api python -m app.verify
 # → RESULT: ALL PASS
 
-# 6. open dashboard
-# http://localhost:8000/dashboard
-# http://localhost:8000/docs      (interactive API)
-# http://localhost:8000/stats     (monitoring)
+# 6. open
+# http://localhost:8000/dashboard   live dashboard
+# http://localhost:8000/docs        interactive API
+# http://localhost:8000/stats       monitoring
 ```
 
-> To switch to 10M: set `HOST_DATA_DIR=./out_main` in `.env`, restart containers, re-run steps 4–5.
+> Switch to 10M: set `HOST_DATA_DIR=./out_main` in `.env`, restart, re-run steps 4–5.
 > **No code changes needed — only `.env`.**
 
 ---
 
 ## Architecture
 
-![Architecture flowchart](docs/architecture_flowchart.png)
+```mermaid
+flowchart TD
+    A([CSV files\ngenerate_data.py]) -->|COPY| B[(Orders DB\nPostgres · 10M rows · 100 tenants)]
+    B -->|INSERT / UPDATE| C{xid_snap trigger\nmonotonic · clock-independent}
+    C -->|changed rows| D[Refresh Worker\nrefresh.py]
+    D -->|adaptive poll\n2s active / 5s idle| D
 
-### How it works
+    D -->|dirty-bucket\nrecompute| E[(rollup_daily\ntenant × day × status × category)]
+    D -->|dirty-bucket\nrecompute| F[(rollup_hourly\ntenant × hour)]
+    D -->|dirty-bucket\nrecompute| G[(rollup_product_daily\ntenant × day × product)]
+    D -->|bump cache_gen| H[(Redis Cache\ngen-keyed · TTL 30s)]
 
+    E --> I[FastAPI Query API\napi.py]
+    F --> I
+    G --> I
+    H --> I
+
+    I -->|per-tenant endpoints\n/tenants/id/...| J([Dashboard\ndashboard.html])
+    I -->|platform endpoints\n/platform/...| J
+
+    D -.->|samples buckets| K([Drift Monitor\ndrift.py])
+    I -.->|ring buffer| L([Query Log\nquery_log.py])
+    B -.->|10 parallel threads| M([Load Simulator\nsimulate.py])
+    E -.->|rollup == direct DB| N([Correctness Check\nverify.py])
+
+    style A fill:#F2F2F2,stroke:#555,color:#333
+    style B fill:#EBF3FD,stroke:#1A5FA8,color:#0D3D6E
+    style C fill:#FEF3E2,stroke:#B07010,color:#7A4E08
+    style D fill:#E4F4F2,stroke:#1A8A7C,color:#0E5750
+    style E fill:#EAF5EC,stroke:#2A7D3E,color:#1A4E27
+    style F fill:#EAF5EC,stroke:#2A7D3E,color:#1A4E27
+    style G fill:#EAF5EC,stroke:#2A7D3E,color:#1A4E27
+    style H fill:#FDF0EE,stroke:#B04030,color:#7A2820
+    style I fill:#F0EDFB,stroke:#5A3FA8,color:#3A2870
+    style J fill:#EBF3FD,stroke:#1A5FA8,color:#0D3D6E
+    style K fill:#F2F2F2,stroke:#555,color:#333
+    style L fill:#F2F2F2,stroke:#555,color:#333
+    style M fill:#F2F2F2,stroke:#555,color:#333
+    style N fill:#F2F2F2,stroke:#555,color:#333
 ```
-CSV files
-   └─► loader.py  ─────────────────────────────► orders table (Postgres)
-                                                       │
-                                               xid_snap trigger
-                                         (monotonic · clock-independent)
-                                                       │
-                                             refresh worker (refresh.py)
-                                          adaptive poll: 2s active / 5s idle
-                                                       │
-                                    dirty-bucket recompute (only changed buckets)
-                                                       │
-                          ┌────────────────────────────┼────────────────┐
-                    rollup_daily              rollup_hourly    rollup_product_daily
-                          └────────────────────────────┼────────────────┘
-                                                       │
-                                               Redis cache
-                                         generation-keyed · TTL 30s
-                                                       │
-                                            FastAPI query API
-                                     /tenants/{id}/...  +  /platform/...
-                                                       │
-                                           Dashboard (dashboard.html)
-                                        smart refresh · xid_snap poll
-```
 
-**Why no Kafka?** The `xid_snap` trigger assigns a monotonic sequence number
-to every write. The worker reads `WHERE xid_snap > last_seen ORDER BY xid_snap`
-— one query, all tenants, O(changed rows). Cost is independent of tenant count.
+**Why no Kafka?** `xid_snap` trigger assigns a monotonic sequence number to every write.
+Worker reads `WHERE xid_snap > last_seen` — one query, all tenants, O(changed rows).
 No broker, no partitions, no rebalancing.
 
 **Why dirty-bucket recompute?** An order can change status days after creation
-(`placed → shipped → cancelled`). Adding deltas causes double-counts. Recomputing
-the whole `(tenant_id, day)` bucket from the base table is always correct and
-handles all status transitions uniformly.
+(`placed → shipped → cancelled`). Recomputing the whole `(tenant, day)` bucket from
+base is always correct and handles all status transitions uniformly.
+
+---
+
+## Database schema
+
+```mermaid
+erDiagram
+    tenants {
+        int tenant_id PK
+        text name
+        date created_at
+    }
+    customers {
+        int customer_id PK
+        int tenant_id FK
+        text name
+        text email
+        date created_at
+    }
+    products {
+        int product_id PK
+        int tenant_id FK
+        text name
+        text category
+        numeric price
+    }
+    orders {
+        bigint order_id PK
+        int tenant_id FK
+        int customer_id FK
+        int product_id FK
+        int quantity
+        numeric unit_price
+        numeric amount
+        text status
+        timestamp created_at
+        timestamp updated_at
+        text category
+        text product_name
+        bigint xid_snap
+    }
+    rollup_daily {
+        int tenant_id FK
+        date day PK
+        text status PK
+        text category PK
+        bigint order_count
+        numeric total_amount
+        bigint total_qty
+    }
+    rollup_hourly {
+        int tenant_id FK
+        timestamp hour PK
+        text status PK
+        text category PK
+        bigint order_count
+        numeric total_amount
+        bigint total_qty
+    }
+    rollup_product_daily {
+        int tenant_id FK
+        date day PK
+        int product_id FK
+        text product_name
+        text category
+        bigint order_count
+        numeric total_amount
+        bigint total_qty
+    }
+    refresh_state {
+        int id PK
+        bigint last_xid_snap
+        timestamp last_run_at
+        bigint rows_last_run
+        timestamp max_updated
+        bigint total_refreshes
+    }
+    metric_config {
+        text name PK
+        text expr
+        text label
+        boolean is_active
+    }
+    rollup_drift_log {
+        bigint id PK
+        timestamp checked_at
+        int buckets_sampled
+        int mismatch_count
+        jsonb details
+    }
+
+    tenants ||--o{ customers : "has"
+    tenants ||--o{ products : "owns"
+    tenants ||--o{ orders : "places"
+    customers ||--o{ orders : "makes"
+    products ||--o{ orders : "appears in"
+    orders ||--o{ rollup_daily : "aggregated into"
+    orders ||--o{ rollup_hourly : "aggregated into"
+    orders ||--o{ rollup_product_daily : "aggregated into"
+    products ||--o{ rollup_product_daily : "referenced by"
+```
+
+**Key design decisions:**
+- `orders.category` + `orders.product_name` — **denormalized** from `products` at load time (no JOIN at query time)
+- `orders.xid_snap` — set by **trigger** on every INSERT/UPDATE (monotonic, clock-independent)
+- `rollup_daily` PK is `(tenant_id, day, status, category)` — composite, structural tenant isolation
+- `refresh_state` — single row (id=1), the worker's watermark cursor
 
 ---
 
@@ -94,45 +209,41 @@ handles all status transitions uniformly.
 
 ### Per-tenant (FR-1 to FR-7)
 
-| Requirement | Endpoint | Example |
+| Req | Endpoint | Example |
 |---|---|---|
-| FR-1 counts & totals | `GET /tenants/{id}/orders/count` | `?from=2025-01-01&to=2026-10-31` |
-| FR-2 trend over time | `GET /tenants/{id}/orders/trend` | `?metric=revenue&granularity=day` |
-| FR-2 hourly granularity | `GET /tenants/{id}/orders/trend` | `?granularity=hour&from=2026-10-31` |
-| FR-3 top-N products | `GET /tenants/{id}/products/top` | `?n=10&by=revenue&offset=0` |
-| FR-4 breakdown | `GET /tenants/{id}/orders/breakdown` | `?by=status` or `?by=category` |
-| FR-5 tenant isolation | every endpoint scoped by `{id}` in URL path | — |
-| FR-6 freshness | handled by worker; see `/freshness` | — |
-| FR-7 simple REST + README | `/docs` (auto) + this file | — |
-| Period comparison | `GET /tenants/{id}/orders/compare` | `?from=&to=&prior_days=7` |
-| Config-driven metric | `GET /tenants/{id}/metrics/{name}` | names: `orders revenue units avg_order_value cancelled_rate shipped_rate gmv_per_unit` |
+| FR-1 | `GET /tenants/{id}/orders/count` | `?from=2025-01-01&to=2026-10-31` |
+| FR-2 | `GET /tenants/{id}/orders/trend` | `?metric=revenue&granularity=day\|hour` |
+| FR-3 | `GET /tenants/{id}/products/top` | `?n=10&by=revenue&offset=0` |
+| FR-4 | `GET /tenants/{id}/orders/breakdown` | `?by=status\|category` |
+| FR-5 | every endpoint scoped by `{id}` | structural isolation |
+| FR-6 | worker + `/freshness` | ~2s freshness |
+| FR-7 | `/docs` + this README | — |
+| — | `GET /tenants/{id}/orders/compare` | `?prior_days=7` |
+| B-4 | `GET /tenants/{id}/metrics/{name}` | `avg_order_value` `cancelled_rate` etc. |
 
-### Platform / centralized (all tenants, operator view)
+### Platform / centralized
 
 | Endpoint | Description |
 |---|---|
 | `GET /platform/summary` | Whole-platform KPIs |
 | `GET /platform/tenants` | All tenants in one call |
-| `GET /platform/orders/count` | Platform-wide counts |
-| `GET /platform/orders/trend` | Platform trend (daily or hourly) |
+| `GET /platform/orders/count\|trend\|breakdown` | Platform-wide aggregates |
 | `GET /platform/products/top` | Cross-tenant top-N |
-| `GET /platform/orders/breakdown` | Platform breakdown by status/category |
 | `GET /platform/leaderboard` | Rank tenants by revenue/orders/units |
 | `GET /platform/metrics/{name}` | Platform-wide metric |
 
-### System / monitoring / admin (Bonus B-1 to B-5)
+### System / admin (Bonus B-1 to B-5)
 
 | Endpoint | Bonus | Description |
 |---|---|---|
-| `GET /freshness` | B-1 | "updated Xs ago", last xid_snap, rows last run |
-| `POST /admin/rebuild` | B-2 | Rebuild all rollups from scratch |
-| `GET /admin/concurrency` | B-3 | Pool used/total, per-tenant active queries |
-| `GET /metrics` | B-4 | List available config-driven metrics |
-| `POST /admin/drift-check` | B-4 | Manual correctness sample check |
-| `GET /stats` | B-5 | Monitoring page: drift, pool, query log, freshness |
-| `GET /admin/scale-report` | — | Base rows, rollup rows, compression ratio, query ms |
-| `GET /admin/query-log` | — | Last 500 queries: tenant, endpoint, ms, cache hit |
-| `GET /admin/query-stats` | — | Cache hit %, p50, p99, max latency |
+| `GET /freshness` | B-1 | Updated Xs ago · last xid_snap |
+| `POST /admin/rebuild` | B-2 | Rebuild rollups from scratch |
+| `GET /admin/concurrency` | B-3 | Pool used/total · per-tenant queries |
+| `GET /metrics` | B-4 | List config-driven metrics |
+| `GET /stats` | B-5 | Monitoring: drift · pool · query log |
+| `POST /admin/drift-check` | — | Manual correctness sample |
+| `GET /admin/scale-report` | — | Compression ratio · query ms |
+| `GET /admin/query-log` | — | Last 500 queries |
 | `GET /dashboard` | — | Live dashboard UI |
 
 ---
@@ -147,53 +258,22 @@ handles all status transitions uniformly.
 | Correctness | most queries | all queries | **100% — ALL PASS** ✅ |
 | Growth (1M→10M) | < 5× slower | < 2× slower | **~1.5×** ✅ |
 
-Scale proof: rollup size grows with `tenants × days × categories`, not raw row
-count. At 10M rows the rollup stays roughly the same size → query time stays flat.
-
 ---
 
-## Database schema (ER diagram)
-
-![ER diagram](docs/er_diagram.png)
-
-| Table | Color | Purpose |
-|---|---|---|
-| `tenants` | Blue | Tenant registry |
-| `customers` | Teal | Customers per tenant |
-| `products` | Purple | Products per tenant (holds `category`) |
-| `orders` | Amber | Main fact table, 10M rows |
-| `rollup_daily` | Green | Pre-computed daily aggregates |
-| `rollup_hourly` | Green | Pre-computed hourly aggregates (FR-2) |
-| `rollup_product_daily` | Green | Pre-computed product aggregates (FR-3) |
-| `refresh_state` | Coral | Worker watermark (single row) |
-| `metric_config` | Gray | Config-driven metrics (B-4) |
-| `rollup_drift_log` | Gray | Correctness sample log |
-
-**Key design decisions:**
-- `orders.category` and `orders.product_name` are **denormalized** from `products` at load time — single-table rollup queries, no JOIN.
-- `orders.xid_snap` is set by a **trigger** on every INSERT/UPDATE — monotonic, clock-independent, no extra sequence overhead.
-- `rollup_daily` primary key is `(tenant_id, day, status, category)` — composite, structural tenant isolation, no guessable integer.
-- `refresh_state` holds a **single row** (id=1) — the worker's watermark cursor.
-
----
-
-## Correctness & isolation proof
+## Correctness proof
 
 ```bash
 docker compose run --rm api python -m app.verify
 ```
 
-Output:
 ```
 == Correctness (rollup == direct DB) ==
   tenant 1:   direct= 1,927,807  rollup= 1,927,807  OK
   tenant 2:   direct=   963,901  rollup=   963,901  OK
   ...
   tenant 100: direct=    19,278  rollup=    19,278  OK
-== Top-N correctness ==
-  tenant 1 top-5 products: OK  ...  tenant 100 top-5 products: OK
-== Tenant isolation ==
-  orphan tenant rows: 0  (must be 0)
+== Top-N correctness ==     tenant 1..100 top-5 products: OK
+== Tenant isolation ==      orphan rows: 0  (must be 0)
 
 RESULT: ALL PASS
 ```
@@ -203,17 +283,16 @@ RESULT: ALL PASS
 ## Live data demo (FR-6)
 
 ```bash
-# Insert a new order — category is auto-filled by trigger
+# Insert a new order
 docker compose exec -T db psql -U hackathon -d hackathon -c \
   "INSERT INTO orders(order_id,tenant_id,customer_id,product_id,
    quantity,unit_price,amount,status,created_at,updated_at)
    VALUES (900000001,1,1,1,1,100,100,'placed',now(),now());"
 
-# Wait ~2s (worker refresh interval), then count goes up:
+# Wait ~2s, count goes up:
 curl "http://localhost:8000/tenants/1/orders/count?from=2024-01-01&to=2026-12-31"
-curl "http://localhost:8000/freshness"
 
-# Change status — see breakdown update:
+# Change status — breakdown updates:
 docker compose exec -T db psql -U hackathon -d hackathon -c \
   "UPDATE orders SET status='cancelled' WHERE order_id=900000001;"
 ```
@@ -223,13 +302,15 @@ docker compose exec -T db psql -U hackathon -d hackathon -c \
 ## Parallel load proof
 
 ```bash
-# 10 threads, all firing simultaneously (one per tenant)
 docker compose run --rm api python -m app.simulate \
   --threads 10 --rate 20 --seconds 60 --verify
 ```
 
-Result: 1,140 inserts + 570 ships + 228 cancels in 60s across 10 parallel threads,
-0 errors, `CORRECTNESS AFTER PARALLEL LOAD: ALL PASS ✓`.
+```
+10 PARALLEL writer threads released simultaneously at t=0
+  +1,140 inserts  |  570 shipped  |  228 cancelled  |  0 errors
+CORRECTNESS AFTER PARALLEL LOAD: ALL PASS ✓
+```
 
 ---
 
@@ -237,14 +318,12 @@ Result: 1,140 inserts + 570 ships + 228 cancels in 60s across 10 parallel thread
 
 | Key | Default | Description |
 |---|---|---|
-| `HOST_DATA_DIR` | `./out_small` | Path to CSV folder on host machine |
-| `ACTIVE_POLL_SEC` | `2` | Worker poll interval when changes found |
-| `IDLE_POLL_SEC` | `5` | Worker poll interval when idle |
+| `HOST_DATA_DIR` | `./out_small` | CSV folder path on host |
+| `ACTIVE_POLL_SEC` | `2` | Worker poll when changes found |
+| `IDLE_POLL_SEC` | `5` | Worker poll when idle |
 | `REFRESH_BATCH_SIZE` | `50000` | Rows per worker batch |
 | `CACHE_TTL_SEC` | `30` | Redis cache TTL |
-| `MAX_CONCURRENT_QUERIES_PER_TENANT` | `4` | Per-tenant heavy-query limit (B-3) |
-| `POSTGRES_*`, `REDIS_PORT`, `API_PORT` | — | Connection settings |
-| `DATA_DIR` | `/data` | Container path — do not change |
+| `MAX_CONCURRENT_QUERIES_PER_TENANT` | `4` | Per-tenant query limit (B-3) |
 
 ---
 
@@ -253,26 +332,23 @@ Result: 1,140 inserts + 570 ships + 228 cancels in 60s across 10 parallel thread
 ```
 multi-tenant-aggregation/
 ├── app/
-│   ├── api.py          # FastAPI: per-tenant + platform endpoints, cache, rate-limit
-│   ├── db.py           # Postgres pool + Redis, all config from env
-│   ├── drift.py        # Background correctness sampler (every 5 min)
-│   ├── loader.py       # CSV COPY loader, schema, denorm, xid_snap trigger
-│   ├── query_log.py    # In-memory ring buffer (last 500 queries)
-│   ├── refresh.py      # Backfill + adaptive incremental worker
-│   ├── rollups.sql     # Rollup tables, refresh_state, metric_config
-│   ├── simulate.py     # Parallel load simulator (10 threads)
-│   ├── verify.py       # Correctness + isolation harness
+│   ├── api.py            FastAPI: per-tenant + platform endpoints
+│   ├── db.py             Postgres pool + Redis, config from env
+│   ├── drift.py          Background correctness sampler (5 min)
+│   ├── loader.py         CSV COPY loader + xid_snap trigger
+│   ├── query_log.py      In-memory query ring buffer
+│   ├── refresh.py        Backfill + adaptive incremental worker
+│   ├── rollups.sql       Rollup tables, refresh_state, metric_config
+│   ├── simulate.py       Parallel load simulator (10 threads)
+│   ├── verify.py         Correctness + isolation harness
 │   └── static/
-│       └── dashboard.html  # Single-file dashboard (per-tenant + platform)
-├── docs/
-│   ├── architecture_flowchart.png
-│   └── er_diagram.png
-├── generate_data.py    # Organiser's generator (--preset small/main)
-├── docker-compose.yml  # db + cache + api + worker
+│       └── dashboard.html    Live dashboard (per-tenant + platform)
+├── generate_data.py      Organiser's generator (--preset small/main)
+├── docker-compose.yml    db + cache + api + worker
 ├── Dockerfile
 ├── requirements.txt
-├── .env.example        # All config — only file judges need to edit
-├── setup.sh            # One-command load + backfill (Mac/Linux)
-├── verify.sh           # One-command correctness + isolation check
+├── .env.example          Only file judges need to edit
+├── setup.sh              One-command load + backfill (Mac/Linux)
+├── verify.sh             One-command correctness check
 └── README.md
 ```
