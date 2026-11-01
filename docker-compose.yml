@@ -1,0 +1,53 @@
+name: multi-tenant-agg
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hackathon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hackathon}
+      POSTGRES_DB: ${POSTGRES_DB:-hackathon}
+    command: >
+      postgres -c shared_buffers=512MB -c work_mem=64MB
+               -c max_wal_size=4GB -c synchronous_commit=off
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hackathon}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  cache:
+    image: redis:7-alpine
+    ports: ["${REDIS_PORT:-6379}:6379"]
+
+  api:
+    build: .
+    command: uvicorn app.api:app --host 0.0.0.0 --port 8000
+    environment: &envref
+      POSTGRES_HOST: db
+      REDIS_HOST: cache
+      POSTGRES_USER: ${POSTGRES_USER:-hackathon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hackathon}
+      POSTGRES_DB: ${POSTGRES_DB:-hackathon}
+      ACTIVE_POLL_SEC: ${ACTIVE_POLL_SEC:-2}
+      IDLE_POLL_SEC: ${IDLE_POLL_SEC:-5}
+      REFRESH_BATCH_SIZE: ${REFRESH_BATCH_SIZE:-50000}
+      CACHE_TTL_SEC: ${CACHE_TTL_SEC:-30}
+      MAX_CONCURRENT_QUERIES_PER_TENANT: ${MAX_CONCURRENT_QUERIES_PER_TENANT:-4}
+      DATA_DIR: /data
+    volumes: ["${HOST_DATA_DIR:-./out_small}:/data"]
+    ports: ["${API_PORT:-8000}:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+
+  worker:
+    build: .
+    command: python -m app.refresh worker
+    environment: *envref
+    volumes: ["${HOST_DATA_DIR:-./out_small}:/data"]
+    depends_on:
+      db: {condition: service_healthy}
+
+volumes:
+  pgdata:

@@ -1,0 +1,8 @@
+out/
+out_small/
+out_main/
+.env
+__pycache__/
+*.pyc
+*.csv
+pgdata/
